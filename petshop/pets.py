@@ -18,9 +18,13 @@ def format_date(d):
 
 @bp.route("/search/<field>/<value>")
 def search(field, value):
+    conn = db.get_db()
+    cursor = conn.cursor()
+    cursor.execute("""select distinct p.id, p.name, p.bought, p.sold, s.name from pet p, animal s, tags_pets tp, tag t  where t.name = ? and tp.tag = t.id and p.species = s.id and tp.pet = p.id order by p.id""", [value])
+    pets = cursor.fetchall()
+    return render_template("search.html", pets=pets)
+    
     # TBD
-    return ""
-
 @bp.route("/")
 def dashboard():
     conn = db.get_db()
@@ -28,9 +32,9 @@ def dashboard():
     oby = request.args.get("order_by", "id") # TODO. This is currently not used. 
     order = request.args.get("order", "asc")
     if order == "asc":
-        cursor.execute(f"select p.id, p.name, p.bought, p.sold, s.name from pet p, animal s where p.species = s.id order by p.id")
+        cursor.execute(f"select p.id, p.name, p.bought, p.sold, s.name from pet p, animal s where p.species = s.id order by p.{oby}")
     else:
-        cursor.execute(f"select p.id, p.name, p.bought, p.sold, s.name from pet p, animal s where p.species = s.id order by p.id desc")
+        cursor.execute(f"select p.id, p.name, p.bought, p.sold, s.name from pet p, animal s where p.species = s.id order by p.{oby} desc")
     pets = cursor.fetchall()
     return render_template('index.html', pets = pets, order="desc" if order=="asc" else "asc")
 
@@ -74,6 +78,13 @@ def edit(pid):
     elif request.method == "POST":
         description = request.form.get('description')
         sold = request.form.get("sold")
+        if sold == 'sell':
+            sold = datetime.datetime.now().strftime("%Y-%m-%d")
+        else: sold = ''
+        cursor.execute('''UPDATE pet
+                        SET sold = ?, description = ?
+                        WHERE id = ?''', (sold,description,pid))
+        conn.commit()
         # TODO Handle sold
         return redirect(url_for("pets.pet_info", pid=pid), 302)
         
